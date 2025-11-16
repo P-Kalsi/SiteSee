@@ -17,6 +17,7 @@ function App() {
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [currentUrl, setCurrentUrl] = useState('')
   const [iframeError, setIframeError] = useState(false)
+  const [useProxy, setUseProxy] = useState(false)
   
   const handleGazeUpdate = useCallback((gazeX,gazeY) => { 
     // Only update if tracking is active
@@ -73,7 +74,15 @@ function App() {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         url = 'https://' + url
       }
-      setCurrentUrl(url)
+      
+      // Use proxy if enabled
+      let finalUrl = url
+      if (useProxy) {
+        // Use a CORS proxy service that supports iframe embedding
+        finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+      }
+      
+      setCurrentUrl(finalUrl)
       setIframeError(false) // Reset error state
       // Reset tracking when loading new website
       setIsTracking(true)
@@ -82,6 +91,61 @@ function App() {
       setIsHeatmapVisible(false)
     }
   }
+
+  // Handle opening website in new window
+  const handleOpenInNewWindow = () => {
+    if (websiteUrl.trim()) {
+      let url = websiteUrl.trim()
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url
+      }
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  // Detect iframe loading errors
+  useEffect(() => {
+    if (!currentUrl) return
+
+    const iframe = document.querySelector('iframe[title="Website to track"]')
+    if (!iframe) return
+
+    const checkIframeError = () => {
+      try {
+        // Try to access iframe content - will throw if blocked
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (!iframeDoc) {
+          // If we can't access the document, it might be blocked
+          setTimeout(() => {
+            try {
+              const test = iframe.contentWindow?.location
+              if (!test) {
+                setIframeError(true)
+              }
+            } catch (e) {
+              setIframeError(true)
+            }
+          }, 2000)
+        }
+      } catch (e) {
+        // Cross-origin error means iframe loaded but we can't access it (this is normal)
+        // Only set error if we can't even detect the iframe window
+        setTimeout(() => {
+          try {
+            const test = iframe.contentWindow
+            if (!test) {
+              setIframeError(true)
+            }
+          } catch (err) {
+            // This is expected for cross-origin iframes, don't set error
+          }
+        }, 2000)
+      }
+    }
+
+    const timeout = setTimeout(checkIframeError, 3000)
+    return () => clearTimeout(timeout)
+  }, [currentUrl])
 
   // Note: Many websites block iframe embedding via X-Frame-Options
   // This is a browser security feature and cannot be bypassed
@@ -136,6 +200,41 @@ function App() {
         >
           Load Website
         </button>
+        <button
+          onClick={handleOpenInNewWindow}
+          disabled={!websiteUrl.trim()}
+          style={{
+            padding: '10px 16px',
+            backgroundColor: websiteUrl.trim() ? '#10b981' : '#9ca3af',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: websiteUrl.trim() ? 'pointer' : 'not-allowed',
+            fontSize: '14px',
+            fontWeight: '600',
+            whiteSpace: 'nowrap'
+          }}
+          title="Open in new window (gaze tracking won't work across windows)"
+        >
+          Open New Window
+        </button>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '12px',
+          color: '#64748b',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap'
+        }}>
+          <input
+            type="checkbox"
+            checked={useProxy}
+            onChange={(e) => setUseProxy(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          Use Proxy
+        </label>
       </div>
 
       {/* Website iframe - only show when heatmap is not visible and URL is set */}
@@ -154,8 +253,12 @@ function App() {
             }}
             title="Website to track"
             allow="camera; microphone"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
             onLoad={() => {
               setIframeError(false)
+            }}
+            onError={() => {
+              setIframeError(true)
             }}
           />
           {iframeError && (
@@ -183,34 +286,71 @@ function App() {
               </p>
               <div style={{ marginBottom: '20px', backgroundColor: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
                 <p style={{ margin: '0 0 12px 0', color: '#1e293b', fontWeight: '600' }}>
-                  ✅ Working Solutions:
+                  ✅ Try These Solutions:
                 </p>
                 <ul style={{ textAlign: 'left', color: '#475569', fontSize: '14px', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
-                  <li><strong>localhost</strong> - Use your own local development server (e.g., <code style={{ backgroundColor: '#e2e8f0', padding: '2px 6px', borderRadius: '4px' }}>http://localhost:3000</code>)</li>
+                  <li><strong>Enable Proxy</strong> - Check the "Use Proxy" checkbox and try loading again</li>
+                  <li><strong>Open in New Window</strong> - Use the "Open New Window" button (note: gaze tracking won't work)</li>
+                  <li><strong>localhost</strong> - Use your own local development server</li>
                   <li><strong>Your own websites</strong> - Sites you control can allow iframe embedding</li>
                   <li><strong>Demo UI</strong> - Use the default demo interface below for testing</li>
-                  <li><strong>Documentation sites</strong> - Some docs sites allow embedding (try MDN, Wikipedia)</li>
                 </ul>
               </div>
-              <button
-                onClick={() => {
-                  setCurrentUrl('')
-                  setWebsiteUrl('')
-                  setIframeError(false)
-                }}
-                style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  fontWeight: '600'
-                }}
-              >
-                Close & Use Demo UI
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={() => {
+                    setUseProxy(true)
+                    handleLoadWebsite()
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Try with Proxy
+                </button>
+                <button
+                  onClick={handleOpenInNewWindow}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#6366f1',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Open in New Window
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentUrl('')
+                    setWebsiteUrl('')
+                    setIframeError(false)
+                    setUseProxy(false)
+                  }}
+                  style={{
+                    padding: '12px 24px',
+                    backgroundColor: '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}
+                >
+                  Close & Use Demo UI
+                </button>
+              </div>
             </div>
           )}
         </>

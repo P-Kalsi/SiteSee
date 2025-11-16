@@ -100,7 +100,7 @@ const GazeHeatmap = ({ data, isVisible = false }) => {
         zIndex: 1000,
         opacity: isVisible ? 1 : 0,
         transition: 'opacity 0.3s ease-in-out',
-        backgroundColor: isVisible ? '#1a1a1a' : 'transparent'
+        backgroundColor: isVisible ? '#e6f3ff' : 'transparent'
       }} 
     />
   );
