@@ -1,0 +1,19 @@
+{
+  "name": "eye-tracker",
+  "version": "1.0.0",
+  "description": "Eye Tracker browser extension with heatmap visualization",
+  "scripts": {
+    "dev": "npx http-server . -p 8080 -o",
+    "build": "echo 'Build script - add your build process here if needed'",
+    "start": "npm run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "heatmap.js": "^2.0.5"
+  }
+}

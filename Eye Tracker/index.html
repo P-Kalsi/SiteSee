@@ -28,13 +28,76 @@
       z-index: 10;
     }
 
-    #doneBtn {
+    #calibrateBtn, #startBtn, #doneBtn {
       position: fixed;
       bottom: 20px;
       right: 20px;
       padding: 14px 22px;
       font-size: 18px;
       z-index: 1000;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    #calibrateBtn:hover {
+      background: #0b7dda;
+    }
+    
+    #startBtn {
+      background: #4CAF50;
+    }
+    
+    #startBtn:hover {
+      background: #45a049;
+    }
+    
+    #doneBtn {
+      background: #f44336;
+    }
+    
+    #doneBtn:hover {
+      background: #da190b;
+    }
+    
+    .calibration-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 9999;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+    }
+    
+    .calibration-dot {
+      width: 20px;
+      height: 20px;
+      background: #ff0000;
+      border-radius: 50%;
+      position: absolute;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+      animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.2); opacity: 0.8; }
+    }
+    
+    #statusText {
+      font-size: 16px;
+      color: #333;
+      margin: 10px 0;
     }
 
     #overlay {
@@ -59,12 +122,20 @@
 </head>
 <body>
 
-  <h1 style="text-align:center;margin-top:20px;">Look Around the Screen</h1>
-  <p style="text-align:center;">Your gaze will generate heatmap data</p>
+  <h1 style="text-align:center;margin-top:20px;">Eye Tracker Heatmap</h1>
+  <p style="text-align:center;" id="statusText">Click "Calibrate" to begin eye tracking setup</p>
 
   <div id="heatmapContainer"></div>
 
-  <button id="doneBtn">DONE</button>
+  <div id="calibrationOverlay" class="calibration-overlay">
+    <h2 id="calibrationTitle">Calibration</h2>
+    <p id="calibrationInstructions">Look at the red dot and click it when it appears</p>
+    <p id="calibrationProgress">Click the dot to continue...</p>
+  </div>
+
+  <button id="calibrateBtn">Calibrate</button>
+  <button id="startBtn" style="display:none;">Start Tracking</button>
+  <button id="doneBtn" style="display:none;">DONE</button>
 
   <!-- OVERLAY FOR RESULTS -->
   <div id="overlay">
@@ -81,6 +152,24 @@
 <script>
   let heatmap;
   let heatmapReady = false;
+  // Use Map with "x,y" as key to track points at specific locations
+  let heatmapData = new Map(); // key: "x,y", value: { x, y, value }
+  let renderInterval = null;
+  let decayInterval = null;
+  let isTracking = false;
+  let isCalibrated = false;
+  let maxValue = 1; // Track the maximum value for heatmap scaling
+  let currentActiveKey = null; // Track which spot is currently being looked at
+  let lastGazeTime = 0;
+  
+  // Configuration
+  const RENDER_INTERVAL_MS = 50; // How often to update the heatmap display
+  const DECAY_INTERVAL_MS = 10000; // How often to apply decay (3x slower - every 600ms)
+  const DECAY_RATE = 0.9; // How much to reduce value each decay cycle (0.997 = 0.3% decay - very slow)
+  const MIN_VALUE = 0.1; // Minimum value before removing point
+  const ACCUMULATION_RATE = 0.3; // How much value to add per gaze detection at same spot
+  const PROXIMITY_THRESHOLD = 40; // Pixels - how close to consider same spot
+  const GAZE_TIMEOUT_MS = 200; // If no gaze for this long, clear active spot
 
   // Create heatmap instance
   function initHeatmap() {
@@ -95,28 +184,397 @@
 
   initHeatmap();
 
-  // Start WebGazer
-  window.webgazer.setGazeListener((data) => {
-    if (!data || !heatmapReady) return;
+  // Get key for a point (rounded to reduce precision for proximity matching)
+  function getKey(x, y) {
+    // Round to nearest threshold to group nearby points
+    const roundedX = Math.round(x / PROXIMITY_THRESHOLD) * PROXIMITY_THRESHOLD;
+    const roundedY = Math.round(y / PROXIMITY_THRESHOLD) * PROXIMITY_THRESHOLD;
+    return `${roundedX},${roundedY}`;
+  }
 
-    heatmap.addData({
-      x: data.x,
-      y: data.y,
-      value: 1
+  // Find existing point near given coordinates
+  function findNearbyPoint(x, y) {
+    const key = getKey(x, y);
+    return heatmapData.get(key);
+  }
+
+  // Update or create point at location - accumulates when looked at
+  function updatePoint(x, y) {
+    // Validate coordinates
+    if (isNaN(x) || isNaN(y) || x < 0 || y < 0) {
+      return;
+    }
+    
+    const key = getKey(x, y);
+    const existing = heatmapData.get(key);
+    
+    // Mark this as the currently active spot
+    currentActiveKey = key;
+    lastGazeTime = Date.now();
+    
+    if (existing) {
+      // Accumulate value when staring at same spot
+      existing.value += ACCUMULATION_RATE;
+      existing.x = x; // Update to exact position
+      existing.y = y;
+      
+      // Update max if this becomes the new maximum
+      if (existing.value > maxValue) {
+        maxValue = existing.value;
+      }
+    } else {
+      // Create new point with initial value
+      const newValue = 1;
+      heatmapData.set(key, {
+        x: x,
+        y: y,
+        value: newValue
+      });
+      
+      // Update max if this becomes the new maximum
+      if (newValue > maxValue) {
+        maxValue = newValue;
+      }
+    }
+  }
+  
+  // Decay function - reduces intensity of inactive points
+  function applyDecay() {
+    if (!heatmapReady || !isTracking || heatmapData.size === 0) return;
+    
+    // Check if current active spot is still active
+    const timeSinceLastGaze = Date.now() - lastGazeTime;
+    if (timeSinceLastGaze > GAZE_TIMEOUT_MS) {
+      currentActiveKey = null; // Clear active spot if no recent gaze
+    }
+    
+    // Apply decay to all inactive points
+    const keysToDelete = [];
+    for (let [key, point] of heatmapData.entries()) {
+      // Skip decay for the currently active spot
+      if (key === currentActiveKey) {
+        continue;
+      }
+      
+      // Decay inactive points
+      point.value *= DECAY_RATE;
+      
+      // Remove points that are too faint
+      if (point.value < MIN_VALUE) {
+        keysToDelete.push(key);
+      }
+    }
+    
+    // Remove faded points
+    keysToDelete.forEach(key => heatmapData.delete(key));
+  }
+
+  // Update heatmap display with current data
+  function updateHeatmapDisplay() {
+    if (!heatmapReady) return;
+    
+    if (heatmapData.size === 0) {
+      heatmap.setData({
+        max: maxValue,
+        data: []
+      });
+      return;
+    }
+
+    // Find current maximum value
+    let currentMaxValue = 0;
+    for (let point of heatmapData.values()) {
+      if (point.value > currentMaxValue) {
+        currentMaxValue = point.value;
+      }
+    }
+
+    // Update max if we have a new maximum
+    if (currentMaxValue > maxValue) {
+      maxValue = currentMaxValue;
+    }
+
+    if (currentMaxValue === 0) {
+      heatmap.setData({
+        max: maxValue,
+        data: []
+      });
+      return;
+    }
+
+    // Convert Map to array and update heatmap
+    const dataArray = Array.from(heatmapData.values());
+    
+    // Ensure max is at least 1 to avoid division issues
+    const finalMax = Math.max(maxValue, 1);
+    
+    // Debug: log occasionally
+    if (Math.random() < 0.05) { // 5% of the time
+      console.log(`Rendering: ${dataArray.length} points, max value: ${finalMax.toFixed(2)}`);
+    }
+    
+    heatmap.setData({
+      max: finalMax,
+      data: dataArray
     });
-  })
-  .begin();
+  }
+  
+  // Render loop - updates display continuously when tracking
+  function renderLoop() {
+    if (isTracking) {
+      updateHeatmapDisplay();
+    }
+  }
 
+  // Start render and decay intervals
+  function startRender() {
+    if (renderInterval) clearInterval(renderInterval);
+    if (decayInterval) clearInterval(decayInterval);
+    
+    // Render loop updates display
+    renderInterval = setInterval(() => {
+      renderLoop();
+    }, RENDER_INTERVAL_MS);
+    
+    // Decay loop fades inactive points
+    decayInterval = setInterval(() => {
+      applyDecay();
+    }, DECAY_INTERVAL_MS);
+    
+    console.log('Render and decay loops started');
+  }
+
+  // Stop render and decay intervals
+  function stopRender() {
+    if (renderInterval) {
+      clearInterval(renderInterval);
+      renderInterval = null;
+    }
+    if (decayInterval) {
+      clearInterval(decayInterval);
+      decayInterval = null;
+    }
+    console.log('Render and decay loops stopped');
+  }
+
+  // Calibration points (9-point calibration)
+  const calibrationPoints = [
+    { x: 0.1, y: 0.1 },   // Top-left
+    { x: 0.5, y: 0.1 },   // Top-center
+    { x: 0.9, y: 0.1 },   // Top-right
+    { x: 0.1, y: 0.5 },   // Middle-left
+    { x: 0.5, y: 0.5 },   // Center
+    { x: 0.9, y: 0.5 },   // Middle-right
+    { x: 0.1, y: 0.9 },   // Bottom-left
+    { x: 0.5, y: 0.9 },   // Bottom-center
+    { x: 0.9, y: 0.9 }    // Bottom-right
+  ];
+  
+  let currentCalibrationPoint = 0;
+  let calibrationData = [];
+
+  // Start calibration process
+  function startCalibration() {
+    // Check if WebGazer is available
+    if (typeof window.webgazer === 'undefined') {
+      alert('WebGazer not loaded! Please refresh the page.');
+      return;
+    }
+    
+    // Check if heatmap library is available
+    if (typeof h337 === 'undefined') {
+      alert('Heatmap.js not loaded! Please refresh the page.');
+      return;
+    }
+    
+    console.log('Starting calibration...');
+    
+    // Initialize WebGazer
+    try {
+      window.webgazer
+        .saveDataAcrossSessions(true)
+        .begin()
+        .then(() => {
+          console.log('WebGazer initialized');
+          // Show video preview
+          window.webgazer.showVideoPreview(true);
+          window.webgazer.showPredictionPoints(true);
+          
+          // Start calibration flow
+          currentCalibrationPoint = 0;
+          calibrationData = [];
+          showCalibrationDot();
+        })
+        .catch((err) => {
+          console.error('WebGazer initialization error:', err);
+          alert('Error initializing WebGazer: ' + err.message);
+        });
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error: ' + error.message);
+    }
+  }
+
+  // Show calibration dot
+  function showCalibrationDot() {
+    const overlay = document.getElementById('calibrationOverlay');
+    const title = document.getElementById('calibrationTitle');
+    const instructions = document.getElementById('calibrationInstructions');
+    const progress = document.getElementById('calibrationProgress');
+    
+    if (currentCalibrationPoint >= calibrationPoints.length) {
+      // Calibration complete
+      finishCalibration();
+      return;
+    }
+    
+    // Show overlay
+    overlay.style.display = 'flex';
+    
+    // Remove any existing dots
+    const existingDot = overlay.querySelector('.calibration-dot');
+    if (existingDot) {
+      existingDot.remove();
+    }
+    
+    // Get point position
+    const point = calibrationPoints[currentCalibrationPoint];
+    const x = point.x * window.innerWidth;
+    const y = point.y * window.innerHeight;
+    
+    // Create and position dot
+    const dot = document.createElement('div');
+    dot.className = 'calibration-dot';
+    dot.style.left = (x - 10) + 'px';
+    dot.style.top = (y - 10) + 'px';
+    overlay.appendChild(dot);
+    
+    // Update instructions
+    title.textContent = `Calibration Point ${currentCalibrationPoint + 1} of ${calibrationPoints.length}`;
+    instructions.textContent = 'Look at the red dot and click it';
+    progress.textContent = `Progress: ${currentCalibrationPoint + 1}/${calibrationPoints.length}`;
+    
+    // Add click handler
+    dot.onclick = function() {
+      // Record calibration point
+      calibrationData.push({
+        x: x,
+        y: y,
+        point: currentCalibrationPoint
+      });
+      
+      // Move to next point
+      currentCalibrationPoint++;
+      
+      // Small delay before next dot
+      setTimeout(() => {
+        showCalibrationDot();
+      }, 300);
+    };
+  }
+
+  // Finish calibration
+  function finishCalibration() {
+    const overlay = document.getElementById('calibrationOverlay');
+    const title = document.getElementById('calibrationTitle');
+    const instructions = document.getElementById('calibrationInstructions');
+    const progress = document.getElementById('calibrationProgress');
+    
+    title.textContent = 'Calibration Complete!';
+    instructions.textContent = 'Your eye tracker is now calibrated.';
+    progress.textContent = 'Click "Start Tracking" to begin.';
+    
+    // Hide overlay after a moment
+    setTimeout(() => {
+      overlay.style.display = 'none';
+      isCalibrated = true;
+      document.getElementById('statusText').textContent = 'Calibration complete! Click "Start Tracking" to begin.';
+      document.getElementById('calibrateBtn').style.display = 'none';
+      document.getElementById('startBtn').style.display = 'block';
+      console.log('✓ Calibration complete');
+    }, 1500);
+  }
+
+  // Wait for WebGazer to be ready
+  window.addEventListener('load', function() {
+    // Wait a bit for scripts to load
+    setTimeout(() => {
+      // Check if WebGazer is available
+      if (typeof window.webgazer === 'undefined') {
+        console.error('WebGazer not loaded! Make sure the script is included.');
+        document.getElementById('statusText').textContent = 'Error: WebGazer not loaded';
+        return;
+      }
+      
+      // Check if heatmap library is available
+      if (typeof h337 === 'undefined') {
+        console.error('Heatmap.js not loaded! Make sure the script is included.');
+        document.getElementById('statusText').textContent = 'Error: Heatmap.js not loaded';
+        return;
+      }
+      
+      console.log('✓ All libraries loaded');
+      
+      // Set up gaze listener (will be active after calibration)
+      window.webgazer.setGazeListener(function(data, elapsedTime) {
+        if (data == null || !isTracking) {
+          return;
+        }
+        
+        // Validate data
+        if (typeof data.x === 'undefined' || typeof data.y === 'undefined') {
+          return;
+        }
+        
+        const x = Math.round(data.x);
+        const y = Math.round(data.y);
+
+        // Update or create point at this location (slowly accumulates)
+        updatePoint(x, y);
+      });
+      
+      // Calibrate button handler
+      document.getElementById('calibrateBtn').onclick = startCalibration;
+      
+    }, 500);
+  });
+  
+  // Start tracking button
+  document.getElementById("startBtn").onclick = function () {
+    isTracking = true;
+    isCalibrated = true; // Ensure it's set
+    document.getElementById('statusText').textContent = 'Tracking active! Look around - spots will slowly get redder as you stare.';
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('doneBtn').style.display = 'block';
+    startRender();
+    console.log('✓ Tracking started');
+    console.log('Heatmap data points:', heatmapData.size);
+    console.log('Render interval:', RENDER_INTERVAL_MS, 'ms');
+    console.log('Decay interval:', DECAY_INTERVAL_MS, 'ms');
+    console.log('Decay rate:', (1 - DECAY_RATE) * 100 + '% per cycle');
+    console.log('Accumulation rate:', ACCUMULATION_RATE);
+  };
 
   // DONE BUTTON
   document.getElementById("doneBtn").onclick = function () {
-    window.webgazer.end();     // stop camera + tracking
+    isTracking = false;
+    stopRender();
+    
+    try {
+      window.webgazer.pause();     // pause tracking
+    } catch (e) {
+      console.log('Error pausing webgazer:', e);
+    }
 
+    // Final update before saving
+    updateHeatmapDisplay();
+    
     const url = heatmap.getDataURL();   // PNG snapshot
     document.getElementById("resultImg").src = url;
     document.getElementById("downloadLink").href = url;
 
     document.getElementById("overlay").style.display = "flex";
+    console.log('✓ Tracking stopped, heatmap saved');
   };
 </script>
 
