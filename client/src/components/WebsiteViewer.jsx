@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './WebsiteViewer.css';
 import Heatmap from './Heatmap';
+import AIInsights from './AIInsights';
 
 function WebsiteViewer({ gazePosition, showLaser, onGazeData, onTrackingStateChange }) {
   const [url, setUrl] = useState('');
@@ -289,6 +290,18 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData, onTrackingStateCha
         >
           Exit heatmap
         </button>
+      )}
+      
+      {/* AI Insights - shown when viewing heatmap */}
+      {showHeatmapView && (
+        <AIInsights 
+          heatmapData={gazeDataRef.current.map(point => ({
+            x: point.absoluteX || point.x,
+            y: point.absoluteY || point.y,
+            value: 1
+          }))} 
+          isVisible={showHeatmapView} 
+        />
       )}
       
       {/* Hide website container when viewing heatmap */}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Calibration from './Calibration';
 import WebsiteViewer from './WebsiteViewer';
+import AIInsights from './AIInsights';
 import './WebGazer.css';
 
 // Feature flag - set to false to remove laser in production
@@ -11,6 +12,7 @@ function WebGazer() {
   const [gazePosition, setGazePosition] = useState(null);
   const [showLaser, setShowLaser] = useState(false); // Start with laser off
   const [isTrackingActive, setIsTrackingActive] = useState(false); // Track if tracking is active
+  const [showHeatmap, setShowHeatmap] = useState(false); // Show heatmap view with insights
   const webgazerRef = useRef(null);
   const gazeDataRef = useRef([]); // Store gaze data for heatmap
   const [panelPosition, setPanelPosition] = useState({ x: null, y: null }); // null = use default CSS positioning
@@ -154,6 +156,13 @@ function WebGazer() {
     // console.log('Gaze data points:', gazeDataRef.current.length);
   };
 
+  // Convert gaze data to heatmap format for AIInsights
+  const heatmapData = gazeDataRef.current.map(point => ({
+    x: point.absoluteX || point.x,
+    y: point.absoluteY || point.y,
+    value: 1
+  }));
+
   return (
     <div className="webgazer-container">
       <WebsiteViewer
@@ -162,6 +171,14 @@ function WebGazer() {
         onGazeData={handleGazeData}
         onTrackingStateChange={handleTrackingStateChange}
       />
+      
+      {/* AI Insights - shown when viewing heatmap */}
+      {showHeatmap && (
+        <AIInsights 
+          heatmapData={heatmapData} 
+          isVisible={showHeatmap} 
+        />
+      )}
       
       {/* Control panel overlay - draggable */}
       <div 
@@ -190,6 +207,13 @@ function WebGazer() {
             </label>
           </div>
           <button
+            onClick={() => setShowHeatmap(!showHeatmap)}
+            className="recalibrate-btn"
+            style={{ marginBottom: '0.5rem' }}
+          >
+            {showHeatmap ? 'Hide Heatmap' : 'View Heatmap'}
+          </button>
+          <button
             onClick={() => {
               // Clear gaze listener before recalibrating
               if (webgazerRef.current && webgazerRef.current.clearGazeListener) {
@@ -197,6 +221,7 @@ function WebGazer() {
               }
               setGazePosition(null);
               gazeDataRef.current = []; // Clear stored gaze data
+              setShowHeatmap(false); // Hide heatmap when recalibrating
               setIsCalibrated(false);
             }}
             className="recalibrate-btn"
