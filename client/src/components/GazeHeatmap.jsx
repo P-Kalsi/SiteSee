@@ -54,30 +54,53 @@ const GazeHeatmap = ({ data, isVisible = false }) => {
 
   // Effect 2: Update the heatmap when new data arrives
   useEffect(() => {
-    // Only proceed if the instance has been successfully loaded and data exists
-    if (heatmapInstance && data && data.length > 0) {
-      const heatmapData = {
-        max: 10,
-        data: data.map(point => ({
-          x: Math.round(point.x),
-          y: Math.round(point.y),
-          value: point.value
-        }))
-      };
-      // THIS IS THE LINE THAT WAS CAUSING THE ERROR
-      heatmapInstance.setData(heatmapData); 
+    // Only proceed if the instance has been successfully loaded
+    if (heatmapInstance) {
+      if (data && data.length > 0) {
+        const heatmapData = {
+          max: 10,
+          data: data.map(point => ({
+            x: Math.round(point.x),
+            y: Math.round(point.y),
+            value: point.value || 1
+          }))
+        };
+        // Update the heatmap with new data
+        heatmapInstance.setData(heatmapData);
+        // Repaint to ensure it's visible
+        heatmapInstance.repaint();
+        console.log('Heatmap updated with', data.length, 'points');
+      }
     }
   }, [heatmapInstance, data]); // Depends on the instance being ready and data changing
+
+  // Effect 3: Repaint when visibility changes
+  useEffect(() => {
+    if (heatmapInstance && isVisible && data && data.length > 0) {
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        if (heatmapInstance) {
+          heatmapInstance.repaint();
+          console.log('Heatmap repainted - visible:', isVisible);
+        }
+      }, 100);
+    }
+  }, [heatmapInstance, isVisible, data]);
 
   return (
     <div 
       ref={heatmapContainerRef} 
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        width: '100vw', 
+        height: '100vh',
         pointerEvents: 'none',
-        zIndex: 999,
+        zIndex: 1000,
         opacity: isVisible ? 1 : 0,
-        transition: 'opacity 0.3s ease-in-out'
+        transition: 'opacity 0.3s ease-in-out',
+        backgroundColor: isVisible ? '#1a1a1a' : 'transparent'
       }} 
     />
   );
