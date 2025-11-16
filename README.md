@@ -78,3 +78,10 @@ The client will run on `http://localhost:5173` (or another port if 5173 is taken
 - Uses public CORS proxy services (AllOrigins, CORS Proxy, etc.)
 - WebGazer.js library is loaded from CDN for eye tracking
 
+# Citations
+
+This project makes use of the WebGazer library, which provides its data collection methodology
+
+Papoutsaki, A., Sangkloy, P., Laskey, J., Daskalova, N., Huang, J., & Hays, J.
+WebGazer: Scalable Webcam Eye Tracking Using User Interactions.
+Proceedings of the 25th International Joint Conference on Artificial Intelligence (IJCAI), 2016.
