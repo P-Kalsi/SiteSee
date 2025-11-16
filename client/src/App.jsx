@@ -1,7 +1,9 @@
 import { useCallback, useState, useEffect } from 'react'
 import WebGazer from './components/WebGazer'
 import GazeHeatmap from './components/GazeHeatmap'
-import WebsiteUI from './components/WebsiteUI' 
+import WebsiteUI from './components/WebsiteUI'
+import AIInsights from './components/AIInsights'
+import FaceCam from './components/FaceCam' 
 
 // Reliable proxy service for CORS bypass
 // Note: Proxies may strip CSS/JS, so websites may appear unstyled
@@ -308,10 +310,11 @@ function App() {
     setRecalibrateTrigger(prev => prev + 1)
   }
 
+
   // Note: Many websites block iframe embedding via X-Frame-Options
   // This is a browser security feature and cannot be bypassed
   // Users should try localhost or websites that allow embedding
-  
+
   return (
     <div style={{ margin: 0, padding: 0, width: '100vw', height: '100vh', position: 'relative' }}>
       {/* WebGazer Component - MUST be first so it's on top */}
@@ -740,7 +743,13 @@ function App() {
       )}
 
       {/* Heatmap Overlay - full screen when visible */}
-      <GazeHeatmap data={heatmapSnapshot} isVisible={isHeatmapVisible} /> 
+      <GazeHeatmap data={heatmapSnapshot} isVisible={isHeatmapVisible} />
+      
+      {/* AI Insights Panel */}
+      <AIInsights heatmapData={heatmapSnapshot} isVisible={isHeatmapVisible} />
+      
+      {/* Face Cam - Toggleable and Draggable */}
+      {isCalibrationComplete && <FaceCam />}
       
       {/* Recalibrate Button - Draggable - only show after calibration is complete */}
       {isCalibrationComplete && (
@@ -875,7 +884,7 @@ function App() {
         )}
       </div>
       )}
-  
+
     </div>
   )
 }
