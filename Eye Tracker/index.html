@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WebGazer + Heatmap Test</title>
+
+  <!-- LOAD WEBGAZER -->
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+
+  <!-- LOAD HEATMAP.JS -->
+  <script src="https://cdn.jsdelivr.net/npm/heatmap.js@2.0.5/build/heatmap.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: white;
+      font-family: Arial, sans-serif;
+    }
+
+    #heatmapContainer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #doneBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 14px 22px;
+      font-size: 18px;
+      z-index: 1000;
+    }
+
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+    }
+
+    img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border: 3px solid white;
+    }
+  </style>
+
+</head>
+<body>
+
+  <h1 style="text-align:center;margin-top:20px;">Look Around the Screen</h1>
+  <p style="text-align:center;">Your gaze will generate heatmap data</p>
+
+  <div id="heatmapContainer"></div>
+
+  <button id="doneBtn">DONE</button>
+
+  <!-- OVERLAY FOR RESULTS -->
+  <div id="overlay">
+    <h2>Your Heatmap</h2>
+    <img id="resultImg">
+    <br>
+    <a id="downloadLink" download="heatmap.png"
+       style="display:inline-block;margin-top:15px;padding:8px 16px;background:white;color:black;">
+       ⬇ DOWNLOAD PNG
+    </a>
+  </div>
+
+
+<script>
+  let heatmap;
+  let heatmapReady = false;
+
+  // Create heatmap instance
+  function initHeatmap() {
+    heatmap = h337.create({
+      container: document.getElementById("heatmapContainer"),
+      radius: 25,
+      maxOpacity: 0.6,
+      blur: 0.9
+    });
+    heatmapReady = true;
+  }
+
+  initHeatmap();
+
+  // Start WebGazer
+  window.webgazer.setGazeListener((data) => {
+    if (!data || !heatmapReady) return;
+
+    heatmap.addData({
+      x: data.x,
+      y: data.y,
+      value: 1
+    });
+  })
+  .begin();
+
+
+  // DONE BUTTON
+  document.getElementById("doneBtn").onclick = function () {
+    window.webgazer.end();     // stop camera + tracking
+
+    const url = heatmap.getDataURL();   // PNG snapshot
+    document.getElementById("resultImg").src = url;
+    document.getElementById("downloadLink").href = url;
+
+    document.getElementById("overlay").style.display = "flex";
+  };
+</script>
+
+</body>
+</html>
