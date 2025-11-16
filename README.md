@@ -8,7 +8,7 @@ A web application that tracks user eye gaze while browsing websites and generate
 - **Website Viewer**: Browse any website while tracking eye gaze
 - **Gaze Data Collection**: Continuously tracks and stores gaze data for heatmap generation
 - **Public Proxy Integration**: Uses public CORS proxy services to embed websites (no server setup required)
-- **Heatmap**: Analyzation tool to map how users interact with the website (in this app, where they are looking)
+- **Heatmap**: An analysis tool to map how users interact with the website (in this app, where they are looking)
 
 ## Setup
 
