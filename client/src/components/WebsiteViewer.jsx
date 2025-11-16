@@ -9,6 +9,8 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
   const [useProxyForThisQuery, setUseProxyForThisQuery] = useState(true);
   const [proxyError, setProxyError] = useState(null);
   const [currentProxyIndex, setCurrentProxyIndex] = useState(0);
+  const [isWebsiteLoaded, setIsWebsiteLoaded] = useState(false);
+  const [isTrackingStopped, setIsTrackingStopped] = useState(false);
   const iframeRef = useRef(null);
   const gazeDataRef = useRef([]);
 
@@ -100,6 +102,8 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
     setIsLoading(true);
     setIframeError(false);
     setProxyError(null);
+    setIsWebsiteLoaded(false); // Reset when loading new URL
+    setIsTrackingStopped(false); // Reset tracking state
     
     // Determine final URL based on proxy settings
     let finalUrl = formattedUrl;
@@ -124,6 +128,16 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
   const handleIframeLoad = () => {
     setIsLoading(false);
     setIframeError(false);
+    setIsWebsiteLoaded(true); // Mark website as loaded
+    setIsTrackingStopped(false); // Reset tracking state when new page loads
+  };
+
+  const handleStopTracking = () => {
+    setIsTrackingStopped(true);
+  };
+
+  const handleResumeTracking = () => {
+    setIsTrackingStopped(false);
   };
 
   const handleIframeError = () => {
@@ -201,6 +215,25 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
           <button type="submit" className="load-button" disabled={isLoading}>
             {isLoading ? 'Loading...' : 'Load Website'}
           </button>
+          {!isTrackingStopped ? (
+            <button 
+              type="button"
+              className="stop-tracking-button"
+              disabled={!isWebsiteLoaded || isLoading}
+              onClick={handleStopTracking}
+            >
+              Stop tracking
+            </button>
+          ) : (
+            <button 
+              type="button"
+              className="resume-tracking-button"
+              disabled={isLoading}
+              onClick={handleResumeTracking}
+            >
+              Resume tracking
+            </button>
+          )}
         </form>
         {proxyError && (
           <div className="error-message" style={{ backgroundColor: 'rgba(255, 68, 68, 0.2)', borderColor: 'rgba(255, 68, 68, 0.5)' }}>
@@ -252,7 +285,7 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
         )}
 
         {/* Laser pointer overlay - positioned absolutely over iframe */}
-        {showLaser && gazePosition && (
+        {showLaser && !isTrackingStopped && gazePosition && (
           <div
             className="laser-pointer-overlay"
             style={{
@@ -260,6 +293,32 @@ function WebsiteViewer({ gazePosition, showLaser, onGazeData }) {
               top: `${gazePosition.y}px`,
             }}
           />
+        )}
+
+        {/* Bottom right buttons - only show when tracking is stopped */}
+        {isTrackingStopped && (
+          <div className="bottom-right-buttons">
+            <button 
+              type="button"
+              className="view-heatmap-button"
+              onClick={() => {
+                // TODO: Implement view heatmap functionality
+                console.log('View heatmap clicked');
+              }}
+            >
+              View heatmap
+            </button>
+            <button 
+              type="button"
+              className="save-png-button"
+              onClick={() => {
+                // TODO: Implement save PNG functionality
+                console.log('Save PNG clicked');
+              }}
+            >
+              Save png
+            </button>
+          </div>
         )}
       </div>
     </div>

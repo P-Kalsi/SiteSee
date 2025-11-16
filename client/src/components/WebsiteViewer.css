@@ -162,3 +162,89 @@
   transition: left 0.1s linear, top 0.1s linear;
 }
 
+.stop-tracking-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background-color: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.stop-tracking-button:hover:not(:disabled) {
+  background-color: #ff2222;
+}
+
+.stop-tracking-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #666;
+}
+
+.resume-tracking-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+.resume-tracking-button:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.resume-tracking-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #666;
+}
+
+.bottom-right-buttons {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 10002;
+}
+
+.view-heatmap-button,
+.save-png-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.view-heatmap-button {
+  background-color: #646cff;
+}
+
+.view-heatmap-button:hover {
+  background-color: #535bf2;
+}
+
+.save-png-button {
+  background-color: #4CAF50;
+}
+
+.save-png-button:hover {
+  background-color: #45a049;
+}
+
